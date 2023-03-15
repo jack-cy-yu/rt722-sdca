@@ -171,12 +171,8 @@ static int rt722_sdca_update_status(struct sdw_slave *slave,
 			 */
 			sdw_write_no_pm(rt722->slave, SDW_SCP_SDCA_INTMASK1,
 				SDW_SCP_SDCA_INTMASK_SDCA_0 | SDW_SCP_SDCA_INTMASK_SDCA_6);
-			// ret = sdw_read_no_pm(rt722->slave, SDW_SCP_SDCA_INTMASK1);
-			// pr_info("%s(%d)0x5c=0x%x\n",__func__,__LINE__,ret);
 			sdw_write_no_pm(rt722->slave, SDW_SCP_SDCA_INTMASK2,
 				SDW_SCP_SDCA_INTMASK_SDCA_8);
-			// ret = sdw_read_no_pm(rt722->slave, SDW_SCP_SDCA_INTMASK2);
-			// pr_info("%s(%d)0x5d=0x%x\n",__func__,__LINE__,ret);
 		}
 	}
 
@@ -202,7 +198,6 @@ static int rt722_sdca_read_prop(struct sdw_slave *slave)
 
 	prop->scp_int1_mask = SDW_SCP_INT1_BUS_CLASH | SDW_SCP_INT1_PARITY;
 	prop->quirks = SDW_SLAVE_QUIRKS_INVALID_INITIAL_PARITY;
-//	prop->is_sdca = true;
 
 	prop->paging_support = true;
 
@@ -262,9 +257,6 @@ static int rt722_sdca_interrupt_callback(struct sdw_slave *slave,
 	int count = 0, retry = 3;
 	unsigned int sdca_cascade, scp_sdca_stat1, scp_sdca_stat2 = 0, val;
 
-	pr_info("%s control_port_stat=%x, sdca_cascade=%x\n", __func__,
-		status->control_port, status->sdca_cascade);
-
 	if (cancel_delayed_work_sync(&rt722->jack_detect_work)) {
 		dev_warn(&slave->dev, "%s the pending delayed_work was cancelled", __func__);
 		/* avoid the HID owner doesn't change to device */
@@ -291,8 +283,6 @@ static int rt722_sdca_interrupt_callback(struct sdw_slave *slave,
 	rt722->scp_sdca_stat2 = ret;
 	if (scp_sdca_stat2)
 		rt722->scp_sdca_stat2 |= scp_sdca_stat2;
-	pr_info("%s rt722->scp_sdca_stat1=0x%x, rt722->scp_sdca_stat2=0x%x", __func__,
-		rt722->scp_sdca_stat1, rt722->scp_sdca_stat2);
 	do {
 		/* clear flag */
 		ret = sdw_read_no_pm(rt722->slave, SDW_SCP_SDCA_INT1);
@@ -339,12 +329,11 @@ static int rt722_sdca_interrupt_callback(struct sdw_slave *slave,
 		stat = scp_sdca_stat1 || scp_sdca_stat2 || sdca_cascade;
 
 		count++;
-		// pr_info("%s(%d) clear flag! sdca_cascade=0x%x,scp_sdca_stat1=0x%x, scp_sdca_stat2=0x%x\n", __func__,
-			// __LINE__,sdca_cascade, scp_sdca_stat1,scp_sdca_stat2);
 	} while (stat != 0 && count < retry);
 
 	if (stat)
-		pr_info("%s scp_sdca_stat1=0x%x, scp_sdca_stat2=0x%x\n", __func__,
+		dev_warn(&slave->dev,
+			"%s scp_sdca_stat1=0x%x, scp_sdca_stat2=0x%x\n", __func__,
 			rt722->scp_sdca_stat1, rt722->scp_sdca_stat2);
 
 	if (status->sdca_cascade && !rt722->disable_irq)
@@ -356,7 +345,6 @@ static int rt722_sdca_interrupt_callback(struct sdw_slave *slave,
 	return 0;
 
 io_error:
-	pr_info("%s(%d)IO error\n",__func__,__LINE__);
 	mutex_unlock(&rt722->disable_irq_lock);
 	pr_err_ratelimited("IO error in %s, ret %d\n", __func__, ret);
 	return ret;
@@ -442,7 +430,7 @@ static int __maybe_unused rt722_sdca_dev_system_suspend(struct device *dev)
 	mutex_lock(&rt722_sdca->disable_irq_lock);
 	rt722_sdca->disable_irq = true;
 	ret1 = sdw_update_no_pm(slave, SDW_SCP_SDCA_INTMASK1,
-				SDW_SCP_SDCA_INTMASK_SDCA_0, 0);
+				SDW_SCP_SDCA_INTMASK_SDCA_0 | SDW_SCP_SDCA_INTMASK_SDCA_6, 0);
 	ret2 = sdw_update_no_pm(slave, SDW_SCP_SDCA_INTMASK2,
 				SDW_SCP_SDCA_INTMASK_SDCA_8, 0);
 	mutex_unlock(&rt722_sdca->disable_irq_lock);

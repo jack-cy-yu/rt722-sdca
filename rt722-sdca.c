@@ -76,7 +76,6 @@ static unsigned int rt722_sdca_button_detect(struct rt722_sdca_priv *rt722)
 	unsigned int btn_type = 0, offset, idx, val, owner;
 	int ret, i;
 	unsigned char buf[3];
-	int check_reg[6] = {0x58,0x59,0x5a,0x5b,0x5c,0x5d};
 
 	/* get current UMP message owner */
 	ret = regmap_read(rt722->regmap,
@@ -103,7 +102,7 @@ static unsigned int rt722_sdca_button_detect(struct rt722_sdca_priv *rt722)
 			goto _end_btn_det_;
 		buf[idx] = val & 0xff;
 	}
-	pr_info("%s,offset=%d,buf[0]=0x%x,buf[1]=0x%x,buf[2]=0x%x\n", __func__, offset,buf[0],buf[1],buf[2]);
+
 	if (buf[0] == 0x11) {
 		switch (buf[1] & 0xf0) {
 		case 0x10:
@@ -152,17 +151,7 @@ static unsigned int rt722_sdca_button_detect(struct rt722_sdca_priv *rt722)
 			break;
 		}
 	}
-	pr_info("%s, button type=0x%x\n", __func__, btn_type);
-	// rt722_sdca_index_read(rt722, RT722_VENDOR_REG, RT722_SDCA_INTR_REC, &val);
-	// pr_info("%s(%d)nid20_idx82=0x%x\n",__func__,__LINE__,val);
-	// rt722_sdca_index_write(rt722, RT722_VENDOR_REG, RT722_SDCA_INTR_REC, 0xffff);
-	// rt722_sdca_index_read(rt722, RT722_VENDOR_REG, RT722_SDCA_INTR_REC, &val);
-	// pr_info("%s(%d)nid20_idx82=0x%x\n",__func__,__LINE__,val);
-	for (i=0; i<ARRAY_SIZE(check_reg);i++) {
-		ret = sdw_read_no_pm(rt722->slave, check_reg[i]);
-		pr_info("%s(%d)0x%x=0x%x\n",__func__,__LINE__,check_reg[i],ret);
-	}
-	
+
 _end_btn_det_:
 	/* Host is owner, so set back to device */
 	if (owner == 0)
@@ -179,16 +168,13 @@ static int rt722_sdca_headset_detect(struct rt722_sdca_priv *rt722)
 	unsigned int det_mode, type_check;;
 	int ret;
 
-	ret = rt722_sdca_index_read(rt722, RT722_VENDOR_REG,
-			RT722_COMBO_JACK_AUTO_CTL2, &type_check);
-	pr_info("%s(%d),nokia-iphone type_check=0x%x\n", __func__,__LINE__, type_check);
 	/* get detected_mode */
 	ret = regmap_read(rt722->regmap,
 		SDW_SDCA_CTL(FUNC_NUM_JACK_CODEC, RT722_SDCA_ENT_GE49, RT722_SDCA_CTL_DETECTED_MODE, 0),
 		&det_mode);
 	if (ret < 0)
 		goto io_error;
-	pr_info("%s(%d), detected_mode=0x%x\n", __func__,__LINE__, det_mode);
+
 	switch (det_mode) {
 	case 0x00:
 		rt722->jack_type = 0;
@@ -212,7 +198,6 @@ static int rt722_sdca_headset_detect(struct rt722_sdca_priv *rt722)
 
 	dev_dbg(&rt722->slave->dev,
 		"%s, detected_mode=0x%x\n", __func__, det_mode);
-	pr_info("%s(%d), detected_mode=0x%x\n", __func__,__LINE__, det_mode);
 
 	return 0;
 
@@ -226,21 +211,21 @@ static void rt722_sdca_jack_detect_handler(struct work_struct *work)
 	struct rt722_sdca_priv *rt722 =
 		container_of(work, struct rt722_sdca_priv, jack_detect_work.work);
 	int btn_type = 0, ret;
-	char btn_type_ch[3];
-	// pr_info("%s(%d)\n", __func__,__LINE__);
+
 	if (!rt722->hs_jack)
 		return;
 
 	if (!rt722->component->card || !rt722->component->card->instantiated)
 		return;
-	pr_info("%s(%d),rt722->scp_sdca_stat1=0x%x\n", __func__,__LINE__,rt722->scp_sdca_stat1);
+
 	/* SDW_SCP_SDCA_INT_SDCA_6 is used for jack detection */
-	if (rt722->scp_sdca_stat1 & SDW_SCP_SDCA_INT_SDCA_6) {
+	if (rt722->scp_sdca_stat1 & SDW_SCP_SDCA_INT_SDCA_6 ||
+		rt722->scp_sdca_stat1 & SDW_SCP_SDCA_INT_SDCA_0) {
 		ret = rt722_sdca_headset_detect(rt722);
 		if (ret < 0)
 			return;
 	}
-	// pr_info("%s(%d)\n", __func__,__LINE__);
+
 	/* SDW_SCP_SDCA_INT_SDCA_8 is used for button detection */
 	if (rt722->scp_sdca_stat2 & SDW_SCP_SDCA_INT_SDCA_8)
 		btn_type = rt722_sdca_button_detect(rt722);
@@ -326,6 +311,20 @@ static void rt722_sdca_btn_check_handler(struct work_struct *work)
 				btn_type |= SND_JACK_BTN_1;
 				break;
 			}
+			switch (buf[1] & 0x0f) {
+			case 0x01:
+				btn_type |= SND_JACK_BTN_2;
+				break;
+			case 0x02:
+				btn_type |= SND_JACK_BTN_3;
+				break;
+			case 0x04:
+				btn_type |= SND_JACK_BTN_0;
+				break;
+			case 0x08:
+				btn_type |= SND_JACK_BTN_1;
+				break;
+			}
 			switch (buf[2]) {
 			case 0x01:
 			case 0x10:
@@ -378,13 +377,9 @@ static void rt722_sdca_jack_init(struct rt722_sdca_priv *rt722)
 	if (rt722->hs_jack) {
 		/* set SCP_SDCA_IntMask1[0]=1 */
 		sdw_write_no_pm(rt722->slave, SDW_SCP_SDCA_INTMASK1, SDW_SCP_SDCA_INTMASK_SDCA_0 | SDW_SCP_SDCA_INTMASK_SDCA_6);
-		ret = sdw_read_no_pm(rt722->slave, SDW_SCP_SDCA_INTMASK1);
-		pr_info("0x5c=0x%x\n",ret);
 		/* set SCP_SDCA_IntMask2[0]=1 */
 		sdw_write_no_pm(rt722->slave, SDW_SCP_SDCA_INTMASK2, SDW_SCP_SDCA_INTMASK_SDCA_8);
 		dev_dbg(&rt722->slave->dev, "in %s enable\n", __func__);
-		ret = sdw_read_no_pm(rt722->slave, SDW_SCP_SDCA_INTMASK2);
-		pr_info("0x5d=0x%x\n",ret);
 		rt722_sdca_index_write(rt722, RT722_VENDOR_HDA_CTL, RT722_HDA_LEGACY_UNSOL_CTL, 0x016E);
 		/* set XU(et03h) & XU(et0Dh) to Not bypassed */
 		regmap_write(rt722->regmap,
@@ -414,7 +409,6 @@ static int rt722_sdca_set_jack_detect(struct snd_soc_component *component,
 			dev_err(component->dev, "%s: failed to resume %d\n", __func__, ret);
 			return ret;
 		}
-
 		/* pm_runtime not enabled yet */
 		dev_dbg(component->dev,	"%s: skipping jack init for now\n", __func__);
 		return 0;
@@ -894,12 +888,6 @@ static int rt722_sdca_fu36_event(struct snd_soc_dapm_widget *w,
 	case SND_SOC_DAPM_POST_PMU:
 		rt722->fu0f_dapm_mute = false;
 		rt722_sdca_set_fu0f_capture_ctl(rt722);
-		sdw_write_no_pm(rt722->slave, 0x0220, 0x3);
-		sdw_write_no_pm(rt722->slave, 0x0230, 0x3);
-		ret = sdw_read_no_pm(rt722->slave, 0x0220);
-		pr_info("%s(%d)0x0220=0x%x\n",__func__,__LINE__,ret);
-		ret = sdw_read_no_pm(rt722->slave, 0x0230);
-		pr_info("%s(%d)0x0230=0x%x\n",__func__,__LINE__,ret);
 		break;
 	case SND_SOC_DAPM_PRE_PMD:
 		rt722->fu0f_dapm_mute = true;
@@ -1211,7 +1199,6 @@ static int rt722_sdca_pcm_hw_params(struct snd_pcm_substream *substream,
 		else
 			return -EINVAL;
 	}
-	pr_info("%s():direction:%d,dai->id=%d,port=%d\n",__func__,direction,dai->id,port);
 	stream_config.frame_rate = params_rate(params);
 	stream_config.ch_count = params_channels(params);
 	stream_config.bps = snd_pcm_format_width(params_format(params));
@@ -1375,9 +1362,6 @@ int rt722_sdca_init(struct device *dev, struct regmap *regmap,
 	rt722->fu1e_mixer_l_mute = rt722->fu1e_mixer_r_mute = true;
 	rt722->fu0f_dapm_mute = true;
 	rt722->fu0f_mixer_l_mute = rt722->fu0f_mixer_r_mute = true;
-
-	/* JD source uses JD1 in default */
-	// rt722->jd_src = RT722_JD1;
 
 	return devm_snd_soc_register_component(dev,
 			&soc_sdca_dev_rt722, rt722_sdca_dai, ARRAY_SIZE(rt722_sdca_dai));
