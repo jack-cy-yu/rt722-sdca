@@ -16,7 +16,8 @@
 #include <linux/workqueue.h>
 
 struct  rt722_sdca_priv {
-	struct regmap *regmap, *mbq_regmap;
+	struct regmap *regmap;
+	struct regmap *mbq_regmap;
 	struct snd_soc_component *component;
 	struct sdw_slave *slave;
 	enum sdw_slave_status status;
@@ -26,14 +27,26 @@ struct  rt722_sdca_priv {
 	struct snd_soc_jack *hs_jack;
 	struct delayed_work jack_detect_work;
 	struct delayed_work jack_btn_check_work;
-	struct mutex calibrate_mutex; /* for headset calibration */
-	struct mutex disable_irq_lock; /* SDCA irq lock protection */
+	struct mutex calibrate_mutex;
+	struct mutex disable_irq_lock;
 	bool disable_irq;
-	int jack_type, jd_src;
-	unsigned int scp_sdca_stat1, scp_sdca_stat2;
+	int jack_type;
+	int jd_src;
+	unsigned int scp_sdca_stat1;
+	unsigned int scp_sdca_stat2;
 	unsigned int hw_id;
-	bool fu1e_dapm_mute, fu1e_mixer_l_mute, fu1e_mixer_r_mute;
-	bool fu0f_dapm_mute, fu0f_mixer_l_mute, fu0f_mixer_r_mute;
+	bool fu1e_dapm_mute;
+	bool fu0f_dapm_mute;
+	bool fu0f_mixer_l_mute;
+	bool fu0f_mixer_r_mute;
+	bool fu1e_mixer_mute[4];
+};
+
+struct rt722_sdca_dmic_kctrl_priv {
+	unsigned int reg_base;
+	unsigned int count;
+	unsigned int max;
+	unsigned int invert;
 };
 
 struct sdw_stream_data {
@@ -188,9 +201,13 @@ struct sdw_stream_data {
 #define RT722_SDCA_CTL_FU_CH_GAIN 0x0b
 
 /* RT722 SDCA channel */
-#define CH_L 0x01
-#define CH_R 0x02
-#define CH_8 0x08
+#define CH_L	0x01
+#define CH_R	0x02
+#define CH_01	0x01
+#define CH_02	0x02
+#define CH_03	0x03
+#define CH_04	0x04
+#define CH_08	0x08
 
 /* sample frequency index */
 #define RT722_SDCA_RATE_16000HZ		0x04

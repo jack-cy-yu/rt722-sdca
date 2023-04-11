@@ -8,10 +8,10 @@
 
 #include <linux/delay.h>
 #include <linux/device.h>
-#include <linux/mod_devicetable.h>
-#include <linux/soundwire/sdw_registers.h>
 #include <linux/module.h>
+#include <linux/mod_devicetable.h>
 #include <linux/pm_runtime.h>
+#include <linux/soundwire/sdw_registers.h>
 
 #include "rt722-sdca.h"
 #include "rt722-sdca-sdw.h"
@@ -19,18 +19,18 @@
 static bool rt722_sdca_readable_register(struct device *dev, unsigned int reg)
 {
 	switch (reg) {
-	case 0x201b ... 0x201f:
-	case 0x202d ... 0x2034:
-	case 0x2230 ... 0x2232:
 	case 0x2f01 ... 0x2f0a:
 	case 0x2f35 ... 0x2f36:
 	case 0x2f50:
 	case 0x2f54:
 	case 0x2f58 ... 0x2f5d:
-	case SDW_SDCA_CTL(FUNC_NUM_JACK_CODEC, RT722_SDCA_ENT_GE49, RT722_SDCA_CTL_SELECTED_MODE, 0):
-	case SDW_SDCA_CTL(FUNC_NUM_JACK_CODEC, RT722_SDCA_ENT_GE49, RT722_SDCA_CTL_DETECTED_MODE, 0):
-	case SDW_SDCA_CTL(FUNC_NUM_HID, RT722_SDCA_ENT_HID01, RT722_SDCA_CTL_HIDTX_CURRENT_OWNER, 0) ...
-		SDW_SDCA_CTL(FUNC_NUM_HID, RT722_SDCA_ENT_HID01, RT722_SDCA_CTL_HIDTX_MESSAGE_LENGTH, 0):
+	case SDW_SDCA_CTL(FUNC_NUM_JACK_CODEC, RT722_SDCA_ENT_GE49, RT722_SDCA_CTL_SELECTED_MODE,
+			0):
+	case SDW_SDCA_CTL(FUNC_NUM_JACK_CODEC, RT722_SDCA_ENT_GE49, RT722_SDCA_CTL_DETECTED_MODE,
+			0):
+	case SDW_SDCA_CTL(FUNC_NUM_HID, RT722_SDCA_ENT_HID01, RT722_SDCA_CTL_HIDTX_CURRENT_OWNER,
+			0) ... SDW_SDCA_CTL(FUNC_NUM_HID, RT722_SDCA_ENT_HID01,
+			RT722_SDCA_CTL_HIDTX_MESSAGE_LENGTH, 0):
 	case RT722_BUF_ADDR_HID1 ... RT722_BUF_ADDR_HID2:
 		return true;
 	default:
@@ -41,16 +41,13 @@ static bool rt722_sdca_readable_register(struct device *dev, unsigned int reg)
 static bool rt722_sdca_volatile_register(struct device *dev, unsigned int reg)
 {
 	switch (reg) {
-	case 0x201b:
-	case 0x201c:
-	case 0x201d:
-	case 0x201f:
-	case 0x202d ... 0x202f:
-	case 0x2230:
 	case 0x2f01:
-	case SDW_SDCA_CTL(FUNC_NUM_JACK_CODEC, RT722_SDCA_ENT_GE49, RT722_SDCA_CTL_DETECTED_MODE, 0):
-	case SDW_SDCA_CTL(FUNC_NUM_HID, RT722_SDCA_ENT_HID01, RT722_SDCA_CTL_HIDTX_CURRENT_OWNER, 0) ...
-		SDW_SDCA_CTL(FUNC_NUM_HID, RT722_SDCA_ENT_HID01, RT722_SDCA_CTL_HIDTX_MESSAGE_LENGTH, 0):
+	case 0x2f54:
+	case SDW_SDCA_CTL(FUNC_NUM_JACK_CODEC, RT722_SDCA_ENT_GE49, RT722_SDCA_CTL_DETECTED_MODE,
+			0):
+	case SDW_SDCA_CTL(FUNC_NUM_HID, RT722_SDCA_ENT_HID01, RT722_SDCA_CTL_HIDTX_CURRENT_OWNER,
+			0) ... SDW_SDCA_CTL(FUNC_NUM_HID, RT722_SDCA_ENT_HID01,
+			RT722_SDCA_CTL_HIDTX_MESSAGE_LENGTH, 0):
 	case RT722_BUF_ADDR_HID1 ... RT722_BUF_ADDR_HID2:
 		return true;
 	default:
@@ -88,16 +85,28 @@ static bool rt722_sdca_mbq_readable_register(struct device *dev, unsigned int re
 	case 0x6100067:
 	case 0x6100070 ... 0x610007c:
 	case 0x6100080:
-	case SDW_SDCA_CTL(FUNC_NUM_MIC_ARRAY, RT722_SDCA_ENT_USER_FU1E, RT722_SDCA_CTL_FU_VOLUME, CH_L):
-	case SDW_SDCA_CTL(FUNC_NUM_MIC_ARRAY, RT722_SDCA_ENT_USER_FU1E, RT722_SDCA_CTL_FU_VOLUME, CH_R):
+	case SDW_SDCA_CTL(FUNC_NUM_MIC_ARRAY, RT722_SDCA_ENT_USER_FU1E, RT722_SDCA_CTL_FU_VOLUME,
+			CH_01):
+	case SDW_SDCA_CTL(FUNC_NUM_MIC_ARRAY, RT722_SDCA_ENT_USER_FU1E, RT722_SDCA_CTL_FU_VOLUME,
+			CH_02):
+	case SDW_SDCA_CTL(FUNC_NUM_MIC_ARRAY, RT722_SDCA_ENT_USER_FU1E, RT722_SDCA_CTL_FU_VOLUME,
+			CH_03):
+	case SDW_SDCA_CTL(FUNC_NUM_MIC_ARRAY, RT722_SDCA_ENT_USER_FU1E, RT722_SDCA_CTL_FU_VOLUME,
+			CH_04):
 	case SDW_SDCA_CTL(FUNC_NUM_AMP, RT722_SDCA_ENT_USER_FU06, RT722_SDCA_CTL_FU_VOLUME, CH_L):
 	case SDW_SDCA_CTL(FUNC_NUM_AMP, RT722_SDCA_ENT_USER_FU06, RT722_SDCA_CTL_FU_VOLUME, CH_R):
-	case SDW_SDCA_CTL(FUNC_NUM_JACK_CODEC, RT722_SDCA_ENT_USER_FU05, RT722_SDCA_CTL_FU_VOLUME, CH_L):
-	case SDW_SDCA_CTL(FUNC_NUM_JACK_CODEC, RT722_SDCA_ENT_USER_FU05, RT722_SDCA_CTL_FU_VOLUME, CH_R):
-	case SDW_SDCA_CTL(FUNC_NUM_JACK_CODEC, RT722_SDCA_ENT_USER_FU0F, RT722_SDCA_CTL_FU_VOLUME, CH_L):
-	case SDW_SDCA_CTL(FUNC_NUM_JACK_CODEC, RT722_SDCA_ENT_USER_FU0F, RT722_SDCA_CTL_FU_VOLUME, CH_R):
-	case SDW_SDCA_CTL(FUNC_NUM_JACK_CODEC, RT722_SDCA_ENT_PLATFORM_FU44, RT722_SDCA_CTL_FU_CH_GAIN, CH_L):
-	case SDW_SDCA_CTL(FUNC_NUM_JACK_CODEC, RT722_SDCA_ENT_PLATFORM_FU44, RT722_SDCA_CTL_FU_CH_GAIN, CH_R):
+	case SDW_SDCA_CTL(FUNC_NUM_JACK_CODEC, RT722_SDCA_ENT_USER_FU05, RT722_SDCA_CTL_FU_VOLUME,
+			CH_L):
+	case SDW_SDCA_CTL(FUNC_NUM_JACK_CODEC, RT722_SDCA_ENT_USER_FU05, RT722_SDCA_CTL_FU_VOLUME,
+			CH_R):
+	case SDW_SDCA_CTL(FUNC_NUM_JACK_CODEC, RT722_SDCA_ENT_USER_FU0F, RT722_SDCA_CTL_FU_VOLUME,
+			CH_L):
+	case SDW_SDCA_CTL(FUNC_NUM_JACK_CODEC, RT722_SDCA_ENT_USER_FU0F, RT722_SDCA_CTL_FU_VOLUME,
+			CH_R):
+	case SDW_SDCA_CTL(FUNC_NUM_JACK_CODEC, RT722_SDCA_ENT_PLATFORM_FU44,
+			RT722_SDCA_CTL_FU_CH_GAIN, CH_L):
+	case SDW_SDCA_CTL(FUNC_NUM_JACK_CODEC, RT722_SDCA_ENT_PLATFORM_FU44,
+			RT722_SDCA_CTL_FU_CH_GAIN, CH_R):
 		return true;
 	default:
 		return false;
@@ -153,7 +162,6 @@ static int rt722_sdca_update_status(struct sdw_slave *slave,
 				enum sdw_slave_status status)
 {
 	struct rt722_sdca_priv *rt722 = dev_get_drvdata(&slave->dev);
-	int ret;
 
 	/* Update the status */
 	rt722->status = status;
@@ -163,12 +171,12 @@ static int rt722_sdca_update_status(struct sdw_slave *slave,
 
 	if (status == SDW_SLAVE_ATTACHED) {
 		if (rt722->hs_jack) {
-			/*
-			 * Due to the SCP_SDCA_INTMASK will be cleared by any reset, and then
-			 * if the device attached again, we will need to set the setting back.
-			 * It could avoid losing the jack detection interrupt.
-			 * This also could sync with the cache value as the rt722_sdca_jack_init set.
-			 */
+		/*
+		 * Due to the SCP_SDCA_INTMASK will be cleared by any reset, and then
+		 * if the device attached again, we will need to set the setting back.
+		 * It could avoid losing the jack detection interrupt.
+		 * This also could sync with the cache value as the rt722_sdca_jack_init set.
+		 */
 			sdw_write_no_pm(rt722->slave, SDW_SCP_SDCA_INTMASK1,
 				SDW_SCP_SDCA_INTMASK_SDCA_0 | SDW_SCP_SDCA_INTMASK_SDCA_6);
 			sdw_write_no_pm(rt722->slave, SDW_SCP_SDCA_INTMASK2,
@@ -255,7 +263,7 @@ static int rt722_sdca_interrupt_callback(struct sdw_slave *slave,
 	struct rt722_sdca_priv *rt722 = dev_get_drvdata(&slave->dev);
 	int ret, stat;
 	int count = 0, retry = 3;
-	unsigned int sdca_cascade, scp_sdca_stat1, scp_sdca_stat2 = 0, val;
+	unsigned int sdca_cascade, scp_sdca_stat1, scp_sdca_stat2 = 0;
 
 	if (cancel_delayed_work_sync(&rt722->jack_detect_work)) {
 		dev_warn(&slave->dev, "%s the pending delayed_work was cancelled", __func__);
@@ -293,8 +301,7 @@ static int rt722_sdca_interrupt_callback(struct sdw_slave *slave,
 				SDW_SCP_SDCA_INT_SDCA_0, SDW_SCP_SDCA_INT_SDCA_0);
 			if (ret < 0)
 				goto io_error;
-		}
-		else if (ret & SDW_SCP_SDCA_INTMASK_SDCA_6) {
+		} else if (ret & SDW_SCP_SDCA_INTMASK_SDCA_6) {
 			ret = sdw_update_no_pm(rt722->slave, SDW_SCP_SDCA_INT1,
 				SDW_SCP_SDCA_INT_SDCA_6, SDW_SCP_SDCA_INT_SDCA_6);
 			if (ret < 0)
