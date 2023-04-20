@@ -28,9 +28,9 @@
 int rt722_sdca_index_write(struct rt722_sdca_priv *rt722,
 		unsigned int nid, unsigned int reg, unsigned int value)
 {
-	int ret;
 	struct regmap *regmap = rt722->mbq_regmap;
 	unsigned int addr = (nid << 20) | reg;
+	int ret;
 
 	ret = regmap_write(regmap, addr, value);
 	if (ret < 0)
@@ -71,6 +71,24 @@ static int rt722_sdca_index_update_bits(struct rt722_sdca_priv *rt722,
 	return rt722_sdca_index_write(rt722, nid, reg, tmp);
 }
 
+static int rt722_sdca_btn_type(unsigned char *buffer)
+{
+	if ((*buffer & 0xf0) == 0x10 || (*buffer & 0x0f) == 0x01 || (*(buffer + 1) == 0x01) ||
+		(*(buffer + 1) == 0x10))
+		return SND_JACK_BTN_2;
+	else if ((*buffer & 0xf0) == 0x20 || (*buffer & 0x0f) == 0x02 || (*(buffer + 1) == 0x02) ||
+		(*(buffer + 1) == 0x20))
+		return SND_JACK_BTN_3;
+	else if ((*buffer & 0xf0) == 0x40 || (*buffer & 0x0f) == 0x04 || (*(buffer + 1) == 0x04) ||
+		(*(buffer + 1) == 0x40))
+		return SND_JACK_BTN_0;
+	else if ((*buffer & 0xf0) == 0x80 || (*buffer & 0x0f) == 0x08 || (*(buffer + 1) == 0x08) ||
+		(*(buffer + 1) == 0x80))
+		return SND_JACK_BTN_1;
+
+	return 0;
+}
+
 static unsigned int rt722_sdca_button_detect(struct rt722_sdca_priv *rt722)
 {
 	unsigned int btn_type = 0, offset, idx, val, owner;
@@ -103,54 +121,8 @@ static unsigned int rt722_sdca_button_detect(struct rt722_sdca_priv *rt722)
 		buf[idx] = val & 0xff;
 	}
 
-	if (buf[0] == 0x11) {
-		switch (buf[1] & 0xf0) {
-		case 0x10:
-			btn_type |= SND_JACK_BTN_2;
-			break;
-		case 0x20:
-			btn_type |= SND_JACK_BTN_3;
-			break;
-		case 0x40:
-			btn_type |= SND_JACK_BTN_0;
-			break;
-		case 0x80:
-			btn_type |= SND_JACK_BTN_1;
-			break;
-		}
-		switch (buf[1] & 0x0f) {
-		case 0x01:
-			btn_type |= SND_JACK_BTN_2;
-			break;
-		case 0x02:
-			btn_type |= SND_JACK_BTN_3;
-			break;
-		case 0x04:
-			btn_type |= SND_JACK_BTN_0;
-			break;
-		case 0x08:
-			btn_type |= SND_JACK_BTN_1;
-			break;
-		}
-		switch (buf[2]) {
-		case 0x01:
-		case 0x10:
-			btn_type |= SND_JACK_BTN_2;
-			break;
-		case 0x02:
-		case 0x20:
-			btn_type |= SND_JACK_BTN_3;
-			break;
-		case 0x04:
-		case 0x40:
-			btn_type |= SND_JACK_BTN_0;
-			break;
-		case 0x08:
-		case 0x80:
-			btn_type |= SND_JACK_BTN_1;
-			break;
-		}
-	}
+	if (buf[0] == 0x11)
+		btn_type = rt722_sdca_btn_type(&buf[1]);
 
 _end_btn_det_:
 	/* Host is owner, so set back to device */
@@ -289,54 +261,8 @@ static void rt722_sdca_btn_check_handler(struct work_struct *work)
 			buf[idx] = val & 0xff;
 		}
 
-		if (buf[0] == 0x11) {
-			switch (buf[1] & 0xf0) {
-			case 0x10:
-				btn_type |= SND_JACK_BTN_2;
-				break;
-			case 0x20:
-				btn_type |= SND_JACK_BTN_3;
-				break;
-			case 0x40:
-				btn_type |= SND_JACK_BTN_0;
-				break;
-			case 0x80:
-				btn_type |= SND_JACK_BTN_1;
-				break;
-			}
-			switch (buf[1] & 0x0f) {
-			case 0x01:
-				btn_type |= SND_JACK_BTN_2;
-				break;
-			case 0x02:
-				btn_type |= SND_JACK_BTN_3;
-				break;
-			case 0x04:
-				btn_type |= SND_JACK_BTN_0;
-				break;
-			case 0x08:
-				btn_type |= SND_JACK_BTN_1;
-				break;
-			}
-			switch (buf[2]) {
-			case 0x01:
-			case 0x10:
-				btn_type |= SND_JACK_BTN_2;
-				break;
-			case 0x02:
-			case 0x20:
-				btn_type |= SND_JACK_BTN_3;
-				break;
-			case 0x04:
-			case 0x40:
-				btn_type |= SND_JACK_BTN_0;
-				break;
-			case 0x08:
-			case 0x80:
-				btn_type |= SND_JACK_BTN_1;
-				break;
-			}
-		}
+		if (buf[0] == 0x11)
+			btn_type = rt722_sdca_btn_type(&buf[1]);
 	} else
 		rt722->jack_type = 0;
 
@@ -484,7 +410,7 @@ static int rt722_sdca_set_gain_put(struct snd_kcontrol *kcontrol,
 	regmap_read(rt722->mbq_regmap, mc->reg, &read_l);
 	regmap_read(rt722->mbq_regmap, mc->rreg, &read_r);
 	if (read_r == gain_r_val && read_l == gain_l_val)
-		return 1;
+		return changed;
 
 	return -EIO;
 }
@@ -526,8 +452,9 @@ static int rt722_sdca_set_gain_get(struct snd_kcontrol *kcontrol,
 			else
 				ctl_r = mc->max - (((0 - read_r) & 0xffff) / interval_offset);
 		}
-	} else
+	} else {
 		ctl_r = ctl_l;
+	}
 
 	ucontrol->value.integer.value[0] = ctl_l;
 	ucontrol->value.integer.value[1] = ctl_r;
@@ -541,7 +468,7 @@ static int rt722_sdca_set_fu1e_capture_ctl(struct rt722_sdca_priv *rt722)
 	unsigned int ch_mute;
 
 	for (i = 0; i < ARRAY_SIZE(rt722->fu1e_mixer_mute); i++) {
-		ch_mute = (rt722->fu1e_dapm_mute || rt722->fu1e_mixer_mute[i]) ? 0x01 : 0x00;
+		ch_mute = rt722->fu1e_dapm_mute || rt722->fu1e_mixer_mute[i];
 		err = regmap_write(rt722->regmap,
 				SDW_SDCA_CTL(FUNC_NUM_MIC_ARRAY, RT722_SDCA_ENT_USER_FU1E,
 				RT722_SDCA_CTL_FU_MUTE, CH_01) + i, ch_mute);
@@ -666,6 +593,8 @@ static int rt722_sdca_dmic_set_gain_get(struct snd_kcontrol *kcontrol,
 	struct rt722_sdca_priv *rt722 = snd_soc_component_get_drvdata(component);
 	struct rt722_sdca_dmic_kctrl_priv *p =
 		(struct rt722_sdca_dmic_kctrl_priv *)kcontrol->private_value;
+	unsigned int boost_step = 0x0a00;
+	unsigned int vol_max = 0x1e00;
 	unsigned int regvalue, ctl, i;
 	unsigned int adc_vol_flag = 0;
 	const unsigned int interval_offset = 0xc0;
@@ -678,10 +607,10 @@ static int rt722_sdca_dmic_set_gain_get(struct snd_kcontrol *kcontrol,
 		regmap_read(rt722->mbq_regmap, p->reg_base + i, &regvalue);
 
 		if (!adc_vol_flag) /* boost gain */
-			ctl = regvalue / 0x0a00;
+			ctl = regvalue / boost_step;
 		else { /* ADC gain */
 			if (adc_vol_flag)
-				ctl = p->max - (((0x1e00 - regvalue) & 0xffff) / interval_offset);
+				ctl = p->max - (((vol_max - regvalue) & 0xffff) / interval_offset);
 			else
 				ctl = p->max - (((0 - regvalue) & 0xffff) / interval_offset);
 		}
@@ -699,6 +628,8 @@ static int rt722_sdca_dmic_set_gain_put(struct snd_kcontrol *kcontrol,
 	struct rt722_sdca_dmic_kctrl_priv *p =
 		(struct rt722_sdca_dmic_kctrl_priv *)kcontrol->private_value;
 	struct rt722_sdca_priv *rt722 = snd_soc_component_get_drvdata(component);
+	unsigned int boost_step = 0x0a00;
+	unsigned int vol_max = 0x1e00;
 	unsigned int gain_val[4];
 	unsigned int i, adc_vol_flag = 0, changed = 0;
 	unsigned int regvalue[4];
@@ -717,9 +648,9 @@ static int rt722_sdca_dmic_set_gain_put(struct snd_kcontrol *kcontrol,
 			gain_val[i] = p->max;
 
 		if (!adc_vol_flag) /* boost gain */
-			gain_val[i] = gain_val[i] * 0x0a00;
+			gain_val[i] = gain_val[i] * boost_step;
 		else { /* ADC gain */
-			gain_val[i] = 0x1e00 - ((p->max - gain_val[i]) * interval_offset);
+			gain_val[i] = vol_max - ((p->max - gain_val[i]) * interval_offset);
 			gain_val[i] &= 0xffff;
 		}
 
@@ -733,7 +664,7 @@ static int rt722_sdca_dmic_set_gain_put(struct snd_kcontrol *kcontrol,
 	for (i = 0; i < p->count; i++) {
 		err = regmap_write(rt722->mbq_regmap, p->reg_base + i, gain_val[i]);
 		if (err < 0)
-			dev_err(&rt722->slave->dev, "0x%08x can't be set\n", p->reg_base + i);
+			dev_err(&rt722->slave->dev, "%#08x can't be set\n", p->reg_base + i);
 	}
 
 	return changed;
@@ -1145,10 +1076,10 @@ static const struct snd_soc_dapm_widget rt722_sdca_dapm_widgets[] = {
 	SND_SOC_DAPM_MUX("ADC 25 Mux", SND_SOC_NOPM, 0, 0,
 		&rt722_sdca_adc25_mux),
 
-	SND_SOC_DAPM_AIF_IN("DP1RX", "DP1 Playback", 0, SND_SOC_NOPM, 0, 0),
-	SND_SOC_DAPM_AIF_OUT("DP2TX", "DP2 Capture", 0, SND_SOC_NOPM, 0, 0),
-	SND_SOC_DAPM_AIF_IN("DP3RX", "DP3 Playback", 0, SND_SOC_NOPM, 0, 0),
-	SND_SOC_DAPM_AIF_OUT("DP6TX", "DP6 Capture", 0, SND_SOC_NOPM, 0, 0),
+	SND_SOC_DAPM_AIF_IN("DP1RX", "DP1 Headphone Playback", 0, SND_SOC_NOPM, 0, 0),
+	SND_SOC_DAPM_AIF_OUT("DP2TX", "DP2 Headset Capture", 0, SND_SOC_NOPM, 0, 0),
+	SND_SOC_DAPM_AIF_IN("DP3RX", "DP3 Speaker Playback", 0, SND_SOC_NOPM, 0, 0),
+	SND_SOC_DAPM_AIF_OUT("DP6TX", "DP6 DMic Capture", 0, SND_SOC_NOPM, 0, 0),
 };
 
 static const struct snd_soc_dapm_route rt722_sdca_audio_map[] = {
@@ -1213,22 +1144,7 @@ static const struct snd_soc_component_driver soc_sdca_dev_rt722 = {
 static int rt722_sdca_set_sdw_stream(struct snd_soc_dai *dai, void *sdw_stream,
 				int direction)
 {
-	struct sdw_stream_data *stream;
-
-	if (!sdw_stream)
-		return 0;
-
-	stream = kzalloc(sizeof(*stream), GFP_KERNEL);
-	if (!stream)
-		return -ENOMEM;
-
-	stream->sdw_stream = sdw_stream;
-
-	/* Use tx_mask or rx_mask to configure stream tag and set dma_data */
-	if (direction == SNDRV_PCM_STREAM_PLAYBACK)
-		dai->playback_dma_data = stream;
-	else
-		dai->capture_dma_data = stream;
+	snd_soc_dai_dma_data_set(dai, direction, sdw_stream);
 
 	return 0;
 }
@@ -1236,11 +1152,7 @@ static int rt722_sdca_set_sdw_stream(struct snd_soc_dai *dai, void *sdw_stream,
 static void rt722_sdca_shutdown(struct snd_pcm_substream *substream,
 				struct snd_soc_dai *dai)
 {
-	struct sdw_stream_data *stream;
-
-	stream = snd_soc_dai_get_dma_data(dai, substream);
 	snd_soc_dai_set_dma_data(dai, substream, NULL);
-	kfree(stream);
 }
 
 static int rt722_sdca_pcm_hw_params(struct snd_pcm_substream *substream,
@@ -1252,20 +1164,25 @@ static int rt722_sdca_pcm_hw_params(struct snd_pcm_substream *substream,
 	struct sdw_stream_config stream_config;
 	struct sdw_port_config port_config;
 	enum sdw_data_direction direction;
-	struct sdw_stream_data *stream;
+	struct sdw_stream_runtime *sdw_stream;
 	int retval, port, num_channels;
 	unsigned int sampling_rate;
 
 	dev_dbg(dai->dev, "%s %s", __func__, dai->name);
-	stream = snd_soc_dai_get_dma_data(dai, substream);
+	sdw_stream = snd_soc_dai_get_dma_data(dai, substream);
 
-	if (!stream)
+	if (!sdw_stream)
 		return -EINVAL;
 
 	if (!rt722->slave)
 		return -EINVAL;
 
-	/* SoundWire specific configuration */
+	/*
+	 * RT722_AIF1 with port = 1 for headphone playback
+	 * RT722_AIF1 with port = 2 for headset-mic capture
+	 * RT722_AIF2 with port = 3 for speaker playback
+	 * RT722_AIF2 with port = 6 for digital-mic capture
+	 */
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
 		direction = SDW_DATA_DIR_RX;
 		if (dai->id == RT722_AIF1)
@@ -1293,7 +1210,7 @@ static int rt722_sdca_pcm_hw_params(struct snd_pcm_substream *substream,
 	port_config.num = port;
 
 	retval = sdw_stream_add_slave(rt722->slave, &stream_config,
-					&port_config, 1, stream->sdw_stream);
+					&port_config, 1, sdw_stream);
 	if (retval) {
 		dev_err(dai->dev, "Unable to configure port\n");
 		return retval;
@@ -1352,13 +1269,13 @@ static int rt722_sdca_pcm_hw_free(struct snd_pcm_substream *substream,
 {
 	struct snd_soc_component *component = dai->component;
 	struct rt722_sdca_priv *rt722 = snd_soc_component_get_drvdata(component);
-	struct sdw_stream_data *stream =
+	struct sdw_stream_runtime *sdw_stream =
 		snd_soc_dai_get_dma_data(dai, substream);
 
 	if (!rt722->slave)
 		return -EINVAL;
 
-	sdw_stream_remove_slave(rt722->slave, stream->sdw_stream);
+	sdw_stream_remove_slave(rt722->slave, sdw_stream);
 	return 0;
 }
 
@@ -1379,14 +1296,14 @@ static struct snd_soc_dai_driver rt722_sdca_dai[] = {
 		.name = "rt722-sdca-aif1",
 		.id = RT722_AIF1,
 		.playback = {
-			.stream_name = "DP1 Playback",
+			.stream_name = "DP1 Headphone Playback",
 			.channels_min = 1,
 			.channels_max = 2,
 			.rates = RT722_STEREO_RATES,
 			.formats = RT722_FORMATS,
 		},
 		.capture = {
-			.stream_name = "DP2 Capture",
+			.stream_name = "DP2 Headset Capture",
 			.channels_min = 1,
 			.channels_max = 2,
 			.rates = RT722_STEREO_RATES,
@@ -1398,14 +1315,14 @@ static struct snd_soc_dai_driver rt722_sdca_dai[] = {
 		.name = "rt722-sdca-aif2",
 		.id = RT722_AIF2,
 		.playback = {
-			.stream_name = "DP3 Playback",
+			.stream_name = "DP3 Speaker Playback",
 			.channels_min = 1,
 			.channels_max = 2,
 			.rates = RT722_STEREO_RATES,
 			.formats = RT722_FORMATS,
 		},
 		.capture = {
-			.stream_name = "DP6 Capture",
+			.stream_name = "DP6 DMic Capture",
 			.channels_min = 1,
 			.channels_max = 2,
 			.rates = RT722_STEREO_RATES,

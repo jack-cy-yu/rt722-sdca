@@ -24,21 +24,22 @@ struct  rt722_sdca_priv {
 	struct sdw_bus_params params;
 	bool hw_init;
 	bool first_hw_init;
-	struct snd_soc_jack *hs_jack;
-	struct delayed_work jack_detect_work;
-	struct delayed_work jack_btn_check_work;
 	struct mutex calibrate_mutex;
 	struct mutex disable_irq_lock;
 	bool disable_irq;
-	int jack_type;
-	int jd_src;
+	/* For Headset jack & Headphone */
 	unsigned int scp_sdca_stat1;
 	unsigned int scp_sdca_stat2;
-	unsigned int hw_id;
-	bool fu1e_dapm_mute;
+	struct snd_soc_jack *hs_jack;
+	struct delayed_work jack_detect_work;
+	struct delayed_work jack_btn_check_work;
+	int jack_type;
+	int jd_src;
 	bool fu0f_dapm_mute;
 	bool fu0f_mixer_l_mute;
 	bool fu0f_mixer_r_mute;
+	/* For DMIC */
+	bool fu1e_dapm_mute;
 	bool fu1e_mixer_mute[4];
 };
 
@@ -49,13 +50,9 @@ struct rt722_sdca_dmic_kctrl_priv {
 	unsigned int invert;
 };
 
-struct sdw_stream_data {
-	struct sdw_stream_runtime *sdw_stream;
-};
-
 /* NID */
-#define RT722_VENDOR_REG				0x20
-#define RT722_VENDOR_CALI				0x58
+#define RT722_VENDOR_REG			0x20
+#define RT722_VENDOR_CALI			0x58
 #define RT722_VENDOR_SPK_EFUSE			0x5c
 #define RT722_VENDOR_IMS_DRE			0x5b
 #define RT722_VENDOR_ANALOG_CTL			0x5f
@@ -64,19 +61,19 @@ struct sdw_stream_data {
 /* Index (NID:20h) */
 #define RT722_JD_PRODUCT_NUM			0x00
 #define RT722_ANALOG_BIAS_CTL3			0x04
-#define RT722_JD_CTRL1					0x09
-#define RT722_LDO2_3_CTL1				0x0e
-#define RT722_LDO1_CTL					0x1a
-#define RT722_HP_JD_CTRL				0x24
-#define RT722_CLSD_CTRL6				0x3c
+#define RT722_JD_CTRL1				0x09
+#define RT722_LDO2_3_CTL1			0x0e
+#define RT722_LDO1_CTL				0x1a
+#define RT722_HP_JD_CTRL			0x24
+#define RT722_CLSD_CTRL6			0x3c
 #define RT722_COMBO_JACK_AUTO_CTL1		0x45
 #define RT722_COMBO_JACK_AUTO_CTL2		0x46
 #define RT722_COMBO_JACK_AUTO_CTL3		0x47
 #define RT722_DIGITAL_MISC_CTRL4		0x4a
-#define RT722_FSM_CTL					0x67
-#define RT722_SDCA_INTR_REC				0x82
-#define RT722_SW_CONFIG1				0x8a
-#define RT722_SW_CONFIG2				0x8b
+#define RT722_FSM_CTL				0x67
+#define RT722_SDCA_INTR_REC			0x82
+#define RT722_SW_CONFIG1			0x8a
+#define RT722_SW_CONFIG2			0x8b
 
 /* Index (NID:58h) */
 #define RT722_DAC_DC_CALI_CTL0			0x00
@@ -94,52 +91,52 @@ struct sdw_stream_data {
 #define RT722_HP_DETECT_RLDET_CTL2		0x2a
 
 /* Index (NID:5fh) */
-#define RT722_MISC_POWER_CTL0				0x00
-#define RT722_MISC_POWER_CTL7				0x08
+#define RT722_MISC_POWER_CTL0			0x00
+#define RT722_MISC_POWER_CTL7			0x08
 
 /* Index (NID:61h) */
-#define RT722_HDA_LEGACY_MUX_CTL0			0x00
-#define RT722_HDA_LEGACY_UNSOL_CTL			0x03
+#define RT722_HDA_LEGACY_MUX_CTL0		0x00
+#define RT722_HDA_LEGACY_UNSOL_CTL		0x03
 #define RT722_HDA_LEGACY_CONFIG_CTL0		0x06
-#define RT722_HDA_LEGACY_RESET_CTL			0x08
+#define RT722_HDA_LEGACY_RESET_CTL		0x08
 #define RT722_HDA_LEGACY_GPIO_WAKE_EN_CTL	0x0e
-#define RT722_DMIC_ENT_FLOAT_CTL			0x10
+#define RT722_DMIC_ENT_FLOAT_CTL		0x10
 #define RT722_DMIC_GAIN_ENT_FLOAT_CTL0		0x11
 #define RT722_DMIC_GAIN_ENT_FLOAT_CTL2		0x13
-#define RT722_ADC_ENT_FLOAT_CTL				0x15
-#define RT722_ADC_VOL_CH_FLOAT_CTL			0x17
-#define RT722_ADC_SAMPLE_RATE_FLOAT			0x18
+#define RT722_ADC_ENT_FLOAT_CTL			0x15
+#define RT722_ADC_VOL_CH_FLOAT_CTL		0x17
+#define RT722_ADC_SAMPLE_RATE_FLOAT		0x18
 #define RT722_DAC03_HP_PDE_FLOAT_CTL		0x22
 #define RT722_MIC2_LINE2_PDE_FLOAT_CTL		0x23
 #define RT722_ET41_LINE2_PDE_FLOAT_CTL		0x24
 #define RT722_ADC0A_08_PDE_FLOAT_CTL		0x25
-#define RT722_ADC10_PDE_FLOAT_CTL			0x26
-#define RT722_DMIC1_2_PDE_FLOAT_CTL			0x28
-#define RT722_AMP_PDE_FLOAT_CTL				0x29
+#define RT722_ADC10_PDE_FLOAT_CTL		0x26
+#define RT722_DMIC1_2_PDE_FLOAT_CTL		0x28
+#define RT722_AMP_PDE_FLOAT_CTL			0x29
 #define RT722_I2S_IN_OUT_PDE_FLOAT_CTL		0x2f
-#define RT722_GE_RELATED_CTL1				0x45
-#define RT722_GE_RELATED_CTL2				0x46
-#define RT722_MIXER_CTL0					0x52
-#define RT722_MIXER_CTL1					0x53
-#define RT722_EAPD_CTL						0x55
-#define RT722_UMP_HID_CTL0					0x60
-#define RT722_UMP_HID_CTL1					0x61
-#define RT722_UMP_HID_CTL2					0x62
-#define RT722_UMP_HID_CTL3					0x63
-#define RT722_UMP_HID_CTL4					0x64
-#define RT722_UMP_HID_CTL5					0x65
-#define RT722_UMP_HID_CTL6					0x66
-#define RT722_UMP_HID_CTL7					0x67
-#define RT722_UMP_HID_CTL8					0x68
+#define RT722_GE_RELATED_CTL1			0x45
+#define RT722_GE_RELATED_CTL2			0x46
+#define RT722_MIXER_CTL0			0x52
+#define RT722_MIXER_CTL1			0x53
+#define RT722_EAPD_CTL				0x55
+#define RT722_UMP_HID_CTL0			0x60
+#define RT722_UMP_HID_CTL1			0x61
+#define RT722_UMP_HID_CTL2			0x62
+#define RT722_UMP_HID_CTL3			0x63
+#define RT722_UMP_HID_CTL4			0x64
+#define RT722_UMP_HID_CTL5			0x65
+#define RT722_UMP_HID_CTL6			0x66
+#define RT722_UMP_HID_CTL7			0x67
+#define RT722_UMP_HID_CTL8			0x68
 
 /* Parameter & Verb control 01 (0x1a)(NID:20h) */
 #define RT722_HIDDEN_REG_SW_RESET (0x1 << 14)
 
 /* combo jack auto switch control 2 (0x46)(NID:20h) */
-#define RT722_COMBOJACK_AUTO_DET_STATUS			(0x1 << 11)
-#define RT722_COMBOJACK_AUTO_DET_TRS			(0x1 << 10)
-#define RT722_COMBOJACK_AUTO_DET_CTIA			(0x1 << 9)
-#define RT722_COMBOJACK_AUTO_DET_OMTP			(0x1 << 8)
+#define RT722_COMBOJACK_AUTO_DET_STATUS		(0x1 << 11)
+#define RT722_COMBOJACK_AUTO_DET_TRS		(0x1 << 10)
+#define RT722_COMBOJACK_AUTO_DET_CTIA		(0x1 << 9)
+#define RT722_COMBOJACK_AUTO_DET_OMTP		(0x1 << 8)
 
 /* DAC calibration control (0x00)(NID:58h) */
 #define RT722_DC_CALIB_CTRL (0x1 << 16)
@@ -154,51 +151,51 @@ struct sdw_stream_data {
 #define RT722_BUF_ADDR_HID2			0x44030020
 
 /* RT722 SDCA Control - function number */
-#define FUNC_NUM_JACK_CODEC 0x01
-#define FUNC_NUM_MIC_ARRAY 0x02
-#define FUNC_NUM_HID 0x03
-#define FUNC_NUM_AMP 0x04
+#define FUNC_NUM_JACK_CODEC			0x01
+#define FUNC_NUM_MIC_ARRAY			0x02
+#define FUNC_NUM_HID				0x03
+#define FUNC_NUM_AMP				0x04
 
 /* RT722 SDCA entity */
-#define RT722_SDCA_ENT_HID01 0x01
-#define RT722_SDCA_ENT_GE49 0x49
-#define RT722_SDCA_ENT_USER_FU05 0x05
-#define RT722_SDCA_ENT_USER_FU06 0x06
-#define RT722_SDCA_ENT_USER_FU0F 0x0f
-#define RT722_SDCA_ENT_USER_FU10 0x19
-#define RT722_SDCA_ENT_USER_FU1E 0x1e
-#define RT722_SDCA_ENT_FU15 0x15
-#define RT722_SDCA_ENT_PDE23 0x23
-#define RT722_SDCA_ENT_PDE40 0x40
-#define RT722_SDCA_ENT_PDE11 0x11
-#define RT722_SDCA_ENT_PDE12 0x12
-#define RT722_SDCA_ENT_PDE2A 0x2a
-#define RT722_SDCA_ENT_CS01 0x01
-#define RT722_SDCA_ENT_CS11 0x11
-#define RT722_SDCA_ENT_CS1F 0x1f
-#define RT722_SDCA_ENT_CS1C 0x1c
-#define RT722_SDCA_ENT_CS31 0x31
-#define RT722_SDCA_ENT_OT23 0x42
-#define RT722_SDCA_ENT_IT26 0x26
-#define RT722_SDCA_ENT_IT09 0x09
-#define RT722_SDCA_ENT_PLATFORM_FU15 0x15
-#define RT722_SDCA_ENT_PLATFORM_FU44 0x44
-#define RT722_SDCA_ENT_XU03 0x03
-#define RT722_SDCA_ENT_XU0D 0x0d
+#define RT722_SDCA_ENT_HID01			0x01
+#define RT722_SDCA_ENT_GE49			0x49
+#define RT722_SDCA_ENT_USER_FU05		0x05
+#define RT722_SDCA_ENT_USER_FU06		0x06
+#define RT722_SDCA_ENT_USER_FU0F		0x0f
+#define RT722_SDCA_ENT_USER_FU10		0x19
+#define RT722_SDCA_ENT_USER_FU1E		0x1e
+#define RT722_SDCA_ENT_FU15			0x15
+#define RT722_SDCA_ENT_PDE23			0x23
+#define RT722_SDCA_ENT_PDE40			0x40
+#define RT722_SDCA_ENT_PDE11			0x11
+#define RT722_SDCA_ENT_PDE12			0x12
+#define RT722_SDCA_ENT_PDE2A			0x2a
+#define RT722_SDCA_ENT_CS01			0x01
+#define RT722_SDCA_ENT_CS11			0x11
+#define RT722_SDCA_ENT_CS1F			0x1f
+#define RT722_SDCA_ENT_CS1C			0x1c
+#define RT722_SDCA_ENT_CS31			0x31
+#define RT722_SDCA_ENT_OT23			0x42
+#define RT722_SDCA_ENT_IT26			0x26
+#define RT722_SDCA_ENT_IT09			0x09
+#define RT722_SDCA_ENT_PLATFORM_FU15		0x15
+#define RT722_SDCA_ENT_PLATFORM_FU44		0x44
+#define RT722_SDCA_ENT_XU03			0x03
+#define RT722_SDCA_ENT_XU0D			0x0d
 
 /* RT722 SDCA control */
-#define RT722_SDCA_CTL_SAMPLE_FREQ_INDEX 0x10
-#define RT722_SDCA_CTL_FU_MUTE 0x01
-#define RT722_SDCA_CTL_FU_VOLUME 0x02
-#define RT722_SDCA_CTL_HIDTX_CURRENT_OWNER 0x10
-#define RT722_SDCA_CTL_HIDTX_SET_OWNER_TO_DEVICE 0x11
-#define RT722_SDCA_CTL_HIDTX_MESSAGE_OFFSET 0x12
-#define RT722_SDCA_CTL_HIDTX_MESSAGE_LENGTH 0x13
-#define RT722_SDCA_CTL_SELECTED_MODE 0x01
-#define RT722_SDCA_CTL_DETECTED_MODE 0x02
-#define RT722_SDCA_CTL_REQ_POWER_STATE 0x01
-#define RT722_SDCA_CTL_VENDOR_DEF 0x30
-#define RT722_SDCA_CTL_FU_CH_GAIN 0x0b
+#define RT722_SDCA_CTL_SAMPLE_FREQ_INDEX		0x10
+#define RT722_SDCA_CTL_FU_MUTE				0x01
+#define RT722_SDCA_CTL_FU_VOLUME			0x02
+#define RT722_SDCA_CTL_HIDTX_CURRENT_OWNER		0x10
+#define RT722_SDCA_CTL_HIDTX_SET_OWNER_TO_DEVICE	0x11
+#define RT722_SDCA_CTL_HIDTX_MESSAGE_OFFSET		0x12
+#define RT722_SDCA_CTL_HIDTX_MESSAGE_LENGTH		0x13
+#define RT722_SDCA_CTL_SELECTED_MODE			0x01
+#define RT722_SDCA_CTL_DETECTED_MODE			0x02
+#define RT722_SDCA_CTL_REQ_POWER_STATE			0x01
+#define RT722_SDCA_CTL_VENDOR_DEF			0x30
+#define RT722_SDCA_CTL_FU_CH_GAIN			0x0b
 
 /* RT722 SDCA channel */
 #define CH_L	0x01
@@ -218,8 +215,8 @@ struct sdw_stream_data {
 #define RT722_SDCA_RATE_192000HZ	0x0d
 
 enum {
-	RT722_AIF1,
-	RT722_AIF2,
+	RT722_AIF1, /* For headset mic and headphone */
+	RT722_AIF2, /* For speaker and dmic */
 	RT722_AIFS,
 };
 
